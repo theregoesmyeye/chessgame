@@ -35,7 +35,14 @@ export default function Game() {
     resetGame,
     isThinking,
     playerColor,
+    gameMode,
   } = useChessGame()
+
+  // Initialize game with correct mode
+  useEffect(() => {
+    console.log("Initializing game with mode:", mode, "isHost:", isHost)
+    resetGame(mode as "single" | "multi", mode === "single" ? (colorParam as "w" | "b") : isHost ? "w" : "b")
+  }, [mode, isHost, colorParam, resetGame])
 
   const { connected, opponent, waitingForOpponent, syncMove } = useMultiplayerGame({
     gameId,
@@ -66,12 +73,16 @@ export default function Game() {
   }, [mode, connected])
 
   const handleSquareClick = (square: string) => {
-    if (mode === "multi" && turn !== (isHost ? "w" : "b")) {
-      return // Not your turn in multiplayer
-    }
-
-    if (mode === "single" && turn !== playerColor) {
-      return // Not your turn in single player
+    // In multiplayer mode, only allow moves on your turn
+    if (mode === "multi") {
+      const playerTurn = isHost ? "w" : "b"
+      if (turn !== playerTurn) {
+        console.log("Not your turn in multiplayer mode")
+        return
+      }
+    } else if (mode === "single" && turn !== playerColor) {
+      // Not your turn in single player
+      return
     }
 
     // When a square is clicked, pass it to the selectSquare function
@@ -79,21 +90,27 @@ export default function Game() {
     const result = selectSquare(square)
 
     if (result.moved && mode === "multi") {
+      console.log("Syncing move in multiplayer mode:", result.from, "to", result.to)
       syncMove(result.from, result.to)
     }
   }
 
   const handlePieceDrop = (from: string, to: string) => {
-    if (mode === "multi" && turn !== (isHost ? "w" : "b")) {
-      return false // Not your turn in multiplayer
-    }
-
-    if (mode === "single" && turn !== playerColor) {
-      return false // Not your turn in single player
+    // In multiplayer mode, only allow moves on your turn
+    if (mode === "multi") {
+      const playerTurn = isHost ? "w" : "b"
+      if (turn !== playerTurn) {
+        console.log("Not your turn in multiplayer mode")
+        return false
+      }
+    } else if (mode === "single" && turn !== playerColor) {
+      // Not your turn in single player
+      return false
     }
 
     const moved = makeMove(from, to)
     if (moved && mode === "multi") {
+      console.log("Syncing move in multiplayer mode:", from, "to", to)
       syncMove(from, to)
     }
     return moved
@@ -106,6 +123,19 @@ export default function Game() {
   const showMultiplayerHelp = () => {
     setShowMultiplayerInfo(true)
   }
+
+  // Debug output
+  useEffect(() => {
+    console.log("Current game state:", {
+      mode,
+      gameMode,
+      isHost,
+      turn,
+      playerColor,
+      waitingForOpponent,
+      opponent,
+    })
+  }, [mode, gameMode, isHost, turn, playerColor, waitingForOpponent, opponent])
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 bg-background">

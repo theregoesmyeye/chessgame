@@ -21,6 +21,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const gameId = params.id
   const data = await request.json()
 
+  console.log("POST request to game API:", gameId, data)
+
   // Get current game state or initialize a new one
   const currentState = gameStates.get(gameId) || {
     id: gameId,
@@ -31,10 +33,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   // Update the game state based on the action type
   if (data.type === "join") {
+    console.log("Player joining:", data.player)
     // Add or update player
-    const playerIndex = currentState.players.findIndex(
-      (p: any) => p.id === data.player.id || p.isHost === data.player.isHost,
-    )
+    const playerIndex = currentState.players.findIndex((p: any) => p.isHost === data.player.isHost)
 
     if (playerIndex >= 0) {
       currentState.players[playerIndex] = {
@@ -48,7 +49,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
         lastSeen: Date.now(),
       })
     }
+
+    console.log("Updated players:", currentState.players)
   } else if (data.type === "move") {
+    console.log("New move:", data.move)
     // Add a new move
     currentState.moves.push({
       ...data.move,
@@ -63,7 +67,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
   } else if (data.type === "ping") {
     // Update player's last seen timestamp
-    const playerIndex = currentState.players.findIndex((p: any) => p.id === data.playerId || p.isHost === data.isHost)
+    const playerIndex = currentState.players.findIndex((p: any) => p.isHost === data.isHost)
 
     if (playerIndex >= 0) {
       currentState.players[playerIndex].lastSeen = Date.now()

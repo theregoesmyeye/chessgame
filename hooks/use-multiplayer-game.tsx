@@ -40,6 +40,7 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
   // Join the game
   const joinGame = useCallback(async () => {
     try {
+      console.log("Joining game:", gameId, "as", isHost ? "host" : "guest")
       const response = await fetch(`/api/games/${gameId}`, {
         method: "POST",
         headers: {
@@ -108,6 +109,9 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
 
       const gameState = await response.json()
 
+      // Debug output
+      console.log("Game state:", gameState)
+
       // Check for opponent
       const players = gameState.players || []
       const opponentPlayer = players.find((p: any) => p.isHost !== isHost)
@@ -151,6 +155,7 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
   const syncMove = useCallback(
     async (from: string, to: string) => {
       try {
+        console.log("Syncing move:", from, "to", to)
         const response = await fetch(`/api/games/${gameId}`, {
           method: "POST",
           headers: {
@@ -169,6 +174,14 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
 
         if (!response.ok) {
           throw new Error("Failed to sync move")
+        }
+
+        // Update our last processed move timestamp
+        const data = await response.json()
+        const moves = data.moves || []
+        if (moves.length > 0) {
+          const latestMove = moves[moves.length - 1]
+          lastProcessedMoveTimestamp.current = latestMove.timestamp
         }
 
         return true

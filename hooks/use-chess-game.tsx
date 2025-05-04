@@ -115,6 +115,7 @@ export function useChessGame() {
 
   // Bot move logic
   const makeBotMove = useCallback(() => {
+    // IMPORTANT: Never make bot moves in multiplayer mode
     if (
       gameMode.current !== "single" ||
       turn !== (playerColor.current === "w" ? "b" : "w") ||
@@ -171,8 +172,9 @@ export function useChessGame() {
     ) // Random delay between 500ms and 1500ms
   }, [game, turn, status, updateGameState, playerColor])
 
-  // Make bot move when it's the bot's turn
+  // Make bot move when it's the bot's turn - ONLY in single player mode
   useEffect(() => {
+    // Double-check that we're in single player mode before making bot moves
     if (
       gameMode.current === "single" &&
       turn !== playerColor.current &&
@@ -199,5 +201,6 @@ export function useChessGame() {
     resetGame,
     isThinking,
     playerColor: playerColor.current,
+    gameMode: gameMode.current,
   }
 }
