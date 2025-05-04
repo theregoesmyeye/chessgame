@@ -23,26 +23,17 @@ export default function Game() {
   const [showMultiplayerInfo, setShowMultiplayerInfo] = useState(true)
   const [connectionAttempts, setConnectionAttempts] = useState(0)
 
-  const {
-    game,
-    board,
-    turn,
-    status,
-    selectedSquare,
-    possibleMoves,
-    makeMove,
-    selectSquare,
-    resetGame,
-    isThinking,
-    playerColor,
-    gameMode,
-  } = useChessGame()
+  // In multiplayer, host is always white, guest is always black
+  const playerColor = mode === "multi" ? (isHost ? "w" : "b") : (colorParam as "w" | "b")
+
+  const { game, board, turn, status, selectedSquare, possibleMoves, makeMove, selectSquare, resetGame, isThinking } =
+    useChessGame()
 
   // Initialize game with correct mode
   useEffect(() => {
-    console.log("Initializing game with mode:", mode, "isHost:", isHost)
-    resetGame(mode as "single" | "multi", mode === "single" ? (colorParam as "w" | "b") : isHost ? "w" : "b")
-  }, [mode, isHost, colorParam, resetGame])
+    console.log("Initializing game with mode:", mode, "isHost:", isHost, "playerColor:", playerColor)
+    resetGame(mode as "single" | "multi", playerColor)
+  }, [mode, isHost, playerColor, resetGame])
 
   const { connected, opponent, waitingForOpponent, syncMove } = useMultiplayerGame({
     gameId,
@@ -72,16 +63,29 @@ export default function Game() {
     }
   }, [mode, connected])
 
+  // Function to check if it's the player's turn in multiplayer
+  const isPlayerTurn = () => {
+    if (mode === "single") {
+      return turn === playerColor
+    } else {
+      // In multiplayer, host plays white, guest plays black
+      return turn === playerColor
+    }
+  }
+
   const handleSquareClick = (square: string) => {
-    // In multiplayer mode, only allow moves on your turn
-    if (mode === "multi") {
-      const playerTurn = isHost ? "w" : "b"
-      if (turn !== playerTurn) {
-        console.log("Not your turn in multiplayer mode")
-        return
-      }
-    } else if (mode === "single" && turn !== playerColor) {
-      // Not your turn in single player
+    // Only allow moves on your turn
+    if (!isPlayerTurn()) {
+      console.log("Not your turn. Current turn:", turn, "Your color:", playerColor)
+      return
+    }
+
+    // Get the piece at the clicked square
+    const piece = game.get(square)
+
+    // If selecting a piece (not an empty square), make sure it's your color
+    if (piece && piece.color !== playerColor) {
+      console.log("Cannot select opponent's piece. Piece color:", piece.color, "Your color:", playerColor)
       return
     }
 
@@ -96,15 +100,18 @@ export default function Game() {
   }
 
   const handlePieceDrop = (from: string, to: string) => {
-    // In multiplayer mode, only allow moves on your turn
-    if (mode === "multi") {
-      const playerTurn = isHost ? "w" : "b"
-      if (turn !== playerTurn) {
-        console.log("Not your turn in multiplayer mode")
-        return false
-      }
-    } else if (mode === "single" && turn !== playerColor) {
-      // Not your turn in single player
+    // Only allow moves on your turn
+    if (!isPlayerTurn()) {
+      console.log("Not your turn. Current turn:", turn, "Your color:", playerColor)
+      return false
+    }
+
+    // Get the piece being moved
+    const piece = game.get(from)
+
+    // Make sure it's your piece
+    if (!piece || piece.color !== playerColor) {
+      console.log("Cannot move opponent's piece. Piece color:", piece?.color, "Your color:", playerColor)
       return false
     }
 
@@ -128,14 +135,14 @@ export default function Game() {
   useEffect(() => {
     console.log("Current game state:", {
       mode,
-      gameMode,
       isHost,
       turn,
       playerColor,
       waitingForOpponent,
       opponent,
+      isPlayerTurn: isPlayerTurn(),
     })
-  }, [mode, gameMode, isHost, turn, playerColor, waitingForOpponent, opponent])
+  }, [mode, isHost, turn, playerColor, waitingForOpponent, opponent])
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 bg-background">
@@ -182,13 +189,8 @@ export default function Game() {
             <GameControls
               status={status}
               turn={turn}
-              onReset={() =>
-                resetGame(
-                  mode as "single" | "multi",
-                  mode === "single" ? (colorParam as "w" | "b") : isHost ? "w" : "b",
-                )
-              }
-              playerColor={mode === "multi" ? (isHost ? "w" : "b") : playerColor}
+              onReset={() => resetGame(mode as "single" | "multi", playerColor)}
+              playerColor={playerColor}
               isThinking={isThinking}
             />
 

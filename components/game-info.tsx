@@ -23,6 +23,8 @@ export function GameInfo({ connected, waitingForOpponent, opponent, gameId, turn
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const isPlayerTurn = turn === (isHost ? "w" : "b")
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -42,8 +44,14 @@ export function GameInfo({ connected, waitingForOpponent, opponent, gameId, turn
           Waiting for opponent to join...
         </div>
       ) : opponent ? (
-        <div className="p-3 bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300 rounded-md">
-          Playing against: {opponent}
+        <div
+          className={`p-3 rounded-md ${
+            isPlayerTurn
+              ? "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300"
+              : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300"
+          }`}
+        >
+          {isPlayerTurn ? "Your turn" : "Opponent's turn"}
         </div>
       ) : null}
 

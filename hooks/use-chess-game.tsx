@@ -32,6 +32,7 @@ export function useChessGame() {
   }, [game])
 
   const resetGame = useCallback((mode: "single" | "multi" = "single", color: "w" | "b" = "w") => {
+    console.log("Resetting game with mode:", mode, "color:", color)
     const newGame = new Chess()
     setGame(newGame)
     setBoard(newGame.fen())
@@ -46,6 +47,8 @@ export function useChessGame() {
   const makeMove = useCallback(
     (from: string, to: string) => {
       try {
+        console.log("Attempting move:", from, "to", to)
+
         // Attempt to make the move
         game.move({ from, to, promotion: "q" })
 
@@ -56,6 +59,7 @@ export function useChessGame() {
         setSelectedSquare(null)
         setPossibleMoves([])
 
+        console.log("Move successful, new turn:", game.turn())
         return true
       } catch (e) {
         console.error("Invalid move:", e)
@@ -180,6 +184,7 @@ export function useChessGame() {
       turn !== playerColor.current &&
       !["checkmate", "draw", "stalemate"].includes(status)
     ) {
+      console.log("Bot's turn in single player mode")
       makeBotMove()
     }
   }, [turn, makeBotMove, status, playerColor])
@@ -201,6 +206,5 @@ export function useChessGame() {
     resetGame,
     isThinking,
     playerColor: playerColor.current,
-    gameMode: gameMode.current,
   }
 }
