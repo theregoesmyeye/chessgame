@@ -8,42 +8,25 @@ interface UseMultiplayerGameProps {
   onMoveReceived: (from: string, to: string) => boolean
 }
 
-interface GamePlayer {
-  id: string
-  isHost: boolean
-  lastSeen: number
-}
-
-interface GameMove {
-  from: string
-  to: string
-  playerId: string
-  timestamp: number
-}
-
-interface GameState {
-  id: string
-  players: GamePlayer[]
-  moves: GameMove[]
-  lastUpdated: number
-}
-
 export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultiplayerGameProps) {
   const [connected, setConnected] = useState(true)
   const [opponent, setOpponent] = useState<string | null>(null)
   const [waitingForOpponent, setWaitingForOpponent] = useState(isHost)
-  const [lastMoveBy, setLastMoveBy] = useState<string | null>(null)
-  const lastProcessedMoveTimestamp = useRef<number>(0)
-  const pollInterval = useRef<NodeJS.Timeout | null>(null)
-  const lastPingTime = useRef<number>(Date.now())
+  const [currentTurn, setCurrentTurn] = useState<"w" | "b">("w") // Chess always starts with white
   const playerId = useRef<string>(Math.random().toString(36).substring(2, 15))
-  const retryCount = useRef<number>(0)
-  const maxRetries = 3
+  const pollInterval = useRef<NodeJS.Timeout | null>(null)
+  const lastMoveTimestamp = useRef<number>(0)
+
+  // Simple function to determine if it's the player's turn
+  const isPlayerTurn = useCallback(() => {
+    return (isHost && currentTurn === "w") || (!isHost && currentTurn === "b")
+  }, [isHost, currentTurn])
 
   // Join the game
   const joinGame = useCallback(async () => {
     try {
       console.log("Joining game:", gameId, "as", isHost ? "host" : "guest", "playerId:", playerId.current)
+
       const response = await fetch(`/api/games/${gameId}`, {
         method: "POST",
         headers: {
@@ -51,11 +34,9 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
         },
         body: JSON.stringify({
           type: "join",
-          player: {
-            id: playerId.current,
-            isHost,
-            joinedAt: Date.now(),
-          },
+          playerId: playerId.current,
+          isHost,
+          timestamp: Date.now(),
         }),
       })
 
@@ -64,7 +45,6 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
       }
 
       setConnected(true)
-      retryCount.current = 0
       return true
     } catch (error) {
       console.error("Error joining game:", error)
@@ -73,135 +53,107 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
     }
   }, [gameId, isHost])
 
-  // Ping to keep connection alive
-  const pingGame = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/games/${gameId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: "ping",
-          playerId: playerId.current,
-          isHost,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to ping game")
-      }
-
-      lastPingTime.current = Date.now()
-      setConnected(true)
-      retryCount.current = 0
-      return true
-    } catch (error) {
-      console.error("Error pinging game:", error)
-      retryCount.current += 1
-
-      if (retryCount.current > maxRetries) {
-        setConnected(false)
-      }
-
-      return false
-    }
-  }, [gameId, isHost])
-
   // Poll for game updates
   const pollGameState = useCallback(async () => {
     try {
-      const response = await fetch(`/api/games/${gameId}`)
+      const response = await fetch(`/api/games/${gameId}?t=${Date.now()}`, {
+        cache: "no-store",
+      })
 
       if (!response.ok) {
         throw new Error("Failed to get game state")
       }
 
       const gameState = await response.json()
-
-      // Debug output
       console.log("Game state:", gameState)
 
       // Check for opponent
       const players = gameState.players || []
       const opponentPlayer = players.find((p: any) => p.isHost !== isHost)
 
-      // Check if opponent is active (seen in the last 30 seconds)
-      const hasActiveOpponent = opponentPlayer && Date.now() - opponentPlayer.lastSeen < 30000
-
-      setWaitingForOpponent(!hasActiveOpponent)
-      setOpponent(hasActiveOpponent ? opponentPlayer.id : null)
-
-      // Process new moves
-      const moves = gameState.moves || []
-
-      // Sort moves by timestamp to ensure correct order
-      moves.sort((a: any, b: any) => a.timestamp - b.timestamp)
-
-      // Find the latest move
-      if (moves.length > 0) {
-        const latestMove = moves[moves.length - 1]
-        setLastMoveBy(latestMove.playerId)
+      if (opponentPlayer) {
+        setOpponent(opponentPlayer.id)
+        setWaitingForOpponent(false)
+      } else {
+        setOpponent(null)
+        setWaitingForOpponent(true)
       }
 
-      // Process only new moves we haven't seen yet
-      const newMoves = moves.filter((move: any) => move.timestamp > lastProcessedMoveTimestamp.current)
+      // Process moves
+      const moves = gameState.moves || []
+
+      // Find new moves we haven't processed yet
+      const newMoves = moves.filter((move: any) => move.timestamp > lastMoveTimestamp.current)
 
       if (newMoves.length > 0) {
-        console.log(`Found ${newMoves.length} new moves to process`)
+        // Sort by timestamp to ensure correct order
+        newMoves.sort((a: any, b: any) => a.timestamp - b.timestamp)
 
-        // Process each move that wasn't made by us
+        // Process each new move
         for (const move of newMoves) {
+          // Only process moves from the opponent
           if (move.playerId !== playerId.current) {
-            console.log("Received move from opponent:", move)
+            console.log("Processing opponent move:", move)
             onMoveReceived(move.from, move.to)
-            lastProcessedMoveTimestamp.current = move.timestamp
-          } else {
-            // Update our last processed timestamp even for our own moves
-            lastProcessedMoveTimestamp.current = Math.max(lastProcessedMoveTimestamp.current, move.timestamp)
+
+            // Update turn after processing the move
+            setCurrentTurn(move.turn === "w" ? "b" : "w")
           }
+
+          // Update our last processed timestamp
+          lastMoveTimestamp.current = Math.max(lastMoveTimestamp.current, move.timestamp)
         }
       }
 
-      // Ping to keep our presence known
-      await pingGame()
+      // Update current turn from game state if available
+      if (gameState.currentTurn) {
+        setCurrentTurn(gameState.currentTurn)
+      }
 
-      retryCount.current = 0
+      // Ping to keep our presence known
+      await fetch(`/api/games/${gameId}/ping`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          playerId: playerId.current,
+          isHost,
+          timestamp: Date.now(),
+        }),
+      })
+
       setConnected(true)
       return true
     } catch (error) {
       console.error("Error polling game state:", error)
-      retryCount.current += 1
-
-      if (retryCount.current > maxRetries) {
-        setConnected(false)
-      }
-
+      setConnected(false)
       return false
     }
-  }, [gameId, isHost, onMoveReceived, pingGame])
+  }, [gameId, isHost, onMoveReceived])
 
   // Function to sync moves with opponent
   const syncMove = useCallback(
     async (from: string, to: string) => {
       try {
-        console.log("Syncing move:", from, "to", to, "by player:", playerId.current)
         const timestamp = Date.now()
+        console.log("Syncing move:", from, "to", to, "by player:", playerId.current)
 
-        const response = await fetch(`/api/games/${gameId}`, {
+        // Calculate the next turn after this move
+        const nextTurn = currentTurn === "w" ? "b" : "w"
+
+        const response = await fetch(`/api/games/${gameId}/move`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            type: "move",
             playerId: playerId.current,
-            move: {
-              from,
-              to,
-              playerId: playerId.current,
-              timestamp,
-            },
+            from,
+            to,
+            timestamp,
+            turn: currentTurn, // Current turn when move was made
+            nextTurn, // Next turn after this move
           }),
         })
 
@@ -209,26 +161,23 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
           throw new Error("Failed to sync move")
         }
 
-        // Update our last processed move timestamp
-        lastProcessedMoveTimestamp.current = timestamp
-        setLastMoveBy(playerId.current)
+        // Update our last processed timestamp
+        lastMoveTimestamp.current = timestamp
 
-        // Immediately poll for updates to reduce latency
-        setTimeout(pollGameState, 500)
+        // Update the turn locally
+        setCurrentTurn(nextTurn)
+
+        // Immediately poll for updates
+        setTimeout(pollGameState, 300)
 
         return true
       } catch (error) {
         console.error("Error syncing move:", error)
-        retryCount.current += 1
-
-        if (retryCount.current > maxRetries) {
-          setConnected(false)
-        }
-
+        setConnected(false)
         return false
       }
     },
-    [gameId, pollGameState],
+    [gameId, pollGameState, currentTurn],
   )
 
   // Initialize game and start polling
@@ -236,8 +185,8 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
     const initialize = async () => {
       await joinGame()
 
-      // Start polling for updates more frequently
-      pollInterval.current = setInterval(pollGameState, 1000) // Poll every second instead of 2 seconds
+      // Start polling for updates
+      pollInterval.current = setInterval(pollGameState, 1000)
 
       // Do an immediate poll after joining
       pollGameState()
@@ -252,34 +201,12 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
     }
   }, [joinGame, pollGameState])
 
-  // Check connection status
-  useEffect(() => {
-    const connectionCheck = setInterval(() => {
-      // If we haven't successfully polled in 10 seconds, consider disconnected
-      if (Date.now() - lastPingTime.current > 10000) {
-        setConnected(false)
-      }
-    }, 5000)
-
-    return () => clearInterval(connectionCheck)
-  }, [])
-
-  // Determine if it's the player's turn based on the last move
-  const isPlayerTurn = useCallback(() => {
-    // If no moves have been made yet, host goes first
-    if (!lastMoveBy) {
-      return isHost
-    }
-
-    // Otherwise, it's the player's turn if the last move was made by the opponent
-    return lastMoveBy !== playerId.current
-  }, [isHost, lastMoveBy])
-
   return {
     connected,
     opponent,
     waitingForOpponent,
     syncMove,
     isPlayerTurn: isPlayerTurn(),
+    currentTurn,
   }
 }

@@ -14,15 +14,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const gameId = params.id
 
   // Return the current game state or an empty state
-  return NextResponse.json(
-    gameStates.get(gameId) || {
-      id: gameId,
-      players: [],
-      moves: [],
-      lastUpdated: Date.now(),
-    },
-    { headers },
-  )
+  const gameState = gameStates.get(gameId) || {
+    id: gameId,
+    players: [],
+    moves: [],
+    currentTurn: "w", // Chess always starts with white
+    lastUpdated: Date.now(),
+  }
+
+  return NextResponse.json(gameState, { headers })
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -36,55 +36,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
     id: gameId,
     players: [],
     moves: [],
+    currentTurn: "w", // Chess always starts with white
     lastUpdated: Date.now(),
   }
 
   // Update the game state based on the action type
   if (data.type === "join") {
-    console.log("Player joining:", data.player)
-    // Add or update player
-    const playerIndex = currentState.players.findIndex((p: any) => p.id === data.player.id)
+    console.log("Player joining:", data.playerId, "isHost:", data.isHost)
+
+    // Check if player already exists
+    const playerIndex = currentState.players.findIndex((p: any) => p.id === data.playerId)
 
     if (playerIndex >= 0) {
+      // Update existing player
       currentState.players[playerIndex] = {
         ...currentState.players[playerIndex],
-        ...data.player,
         lastSeen: Date.now(),
       }
     } else {
-      currentState.players.push({
-        ...data.player,
-        lastSeen: Date.now(),
-      })
-    }
-
-    console.log("Updated players:", currentState.players)
-  } else if (data.type === "move") {
-    console.log("New move:", data.move)
-
-    // Ensure the move has a timestamp
-    const moveWithTimestamp = {
-      ...data.move,
-      timestamp: data.move.timestamp || Date.now(),
-    }
-
-    // Add a new move
-    currentState.moves.push(moveWithTimestamp)
-
-    // Update player's last seen timestamp
-    const playerIndex = currentState.players.findIndex((p: any) => p.id === data.playerId)
-
-    if (playerIndex >= 0) {
-      currentState.players[playerIndex].lastSeen = Date.now()
-    }
-  } else if (data.type === "ping") {
-    // Update player's last seen timestamp
-    const playerIndex = currentState.players.findIndex((p: any) => p.id === data.playerId)
-
-    if (playerIndex >= 0) {
-      currentState.players[playerIndex].lastSeen = Date.now()
-    } else {
-      // If player not found, add them
+      // Add new player
       currentState.players.push({
         id: data.playerId,
         isHost: data.isHost,

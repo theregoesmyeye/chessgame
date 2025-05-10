@@ -35,7 +35,7 @@ export default function Game() {
     resetGame(mode as "single" | "multi", playerColor)
   }, [mode, isHost, playerColor, resetGame])
 
-  const { connected, opponent, waitingForOpponent, syncMove, isPlayerTurn } = useMultiplayerGame({
+  const { connected, opponent, waitingForOpponent, syncMove, isPlayerTurn, currentTurn } = useMultiplayerGame({
     gameId,
     isHost,
     onMoveReceived: makeMove,
@@ -76,7 +76,7 @@ export default function Game() {
   const handleSquareClick = (square: string) => {
     // In multiplayer mode, enforce turn-based restrictions
     if (mode === "multi") {
-      if (!checkPlayerTurn()) {
+      if (!isPlayerTurn) {
         console.log("Not your turn in multiplayer. isPlayerTurn:", isPlayerTurn)
         return
       }
@@ -84,7 +84,7 @@ export default function Game() {
       // If no square is selected yet, make sure we're selecting our own piece
       if (!selectedSquare) {
         const piece = game.get(square)
-        if (piece && piece.color !== playerColor) {
+        if (!piece || piece.color !== playerColor) {
           console.log("Cannot select opponent's piece in multiplayer")
           return
         }
@@ -104,7 +104,7 @@ export default function Game() {
   const handlePieceDrop = (from: string, to: string) => {
     // In multiplayer mode, enforce turn-based restrictions
     if (mode === "multi") {
-      if (!checkPlayerTurn()) {
+      if (!isPlayerTurn) {
         console.log("Not your turn in multiplayer. isPlayerTurn:", isPlayerTurn)
         return false
       }
@@ -132,6 +132,21 @@ export default function Game() {
   const showMultiplayerHelp = () => {
     setShowMultiplayerInfo(true)
   }
+
+  // Debug output
+  useEffect(() => {
+    if (mode === "multi") {
+      console.log("Multiplayer state:", {
+        isHost,
+        playerColor,
+        turn,
+        currentTurn,
+        isPlayerTurn,
+        waitingForOpponent,
+        opponent,
+      })
+    }
+  }, [mode, isHost, playerColor, turn, currentTurn, isPlayerTurn, waitingForOpponent, opponent])
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 bg-background">
@@ -162,7 +177,7 @@ export default function Game() {
                 gameId={gameId}
                 turn={turn}
                 isHost={isHost}
-                isPlayerTurn={checkPlayerTurn()}
+                isPlayerTurn={isPlayerTurn}
               />
             )}
 
