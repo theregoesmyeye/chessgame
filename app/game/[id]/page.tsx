@@ -74,19 +74,21 @@ export default function Game() {
   }
 
   const handleSquareClick = (square: string) => {
-    // Only allow moves on your turn
-    if (!isPlayerTurn()) {
-      console.log("Not your turn. Current turn:", turn, "Your color:", playerColor)
-      return
-    }
+    // In multiplayer mode, enforce turn-based restrictions
+    if (mode === "multi") {
+      if (!isPlayerTurn()) {
+        console.log("Not your turn in multiplayer. Current turn:", turn, "Your color:", playerColor)
+        return
+      }
 
-    // Get the piece at the clicked square
-    const piece = game.get(square)
-
-    // If selecting a piece (not an empty square), make sure it's your color
-    if (piece && piece.color !== playerColor) {
-      console.log("Cannot select opponent's piece. Piece color:", piece.color, "Your color:", playerColor)
-      return
+      // If no square is selected yet, make sure we're selecting our own piece
+      if (!selectedSquare) {
+        const piece = game.get(square)
+        if (piece && piece.color !== playerColor) {
+          console.log("Cannot select opponent's piece in multiplayer")
+          return
+        }
+      }
     }
 
     // When a square is clicked, pass it to the selectSquare function
@@ -100,19 +102,19 @@ export default function Game() {
   }
 
   const handlePieceDrop = (from: string, to: string) => {
-    // Only allow moves on your turn
-    if (!isPlayerTurn()) {
-      console.log("Not your turn. Current turn:", turn, "Your color:", playerColor)
-      return false
-    }
+    // In multiplayer mode, enforce turn-based restrictions
+    if (mode === "multi") {
+      if (!isPlayerTurn()) {
+        console.log("Not your turn in multiplayer. Current turn:", turn, "Your color:", playerColor)
+        return false
+      }
 
-    // Get the piece being moved
-    const piece = game.get(from)
-
-    // Make sure it's your piece
-    if (!piece || piece.color !== playerColor) {
-      console.log("Cannot move opponent's piece. Piece color:", piece?.color, "Your color:", playerColor)
-      return false
+      // Make sure we're moving our own piece
+      const piece = game.get(from)
+      if (!piece || piece.color !== playerColor) {
+        console.log("Cannot move opponent's piece in multiplayer")
+        return false
+      }
     }
 
     const moved = makeMove(from, to)
@@ -130,19 +132,6 @@ export default function Game() {
   const showMultiplayerHelp = () => {
     setShowMultiplayerInfo(true)
   }
-
-  // Debug output
-  useEffect(() => {
-    console.log("Current game state:", {
-      mode,
-      isHost,
-      turn,
-      playerColor,
-      waitingForOpponent,
-      opponent,
-      isPlayerTurn: isPlayerTurn(),
-    })
-  }, [mode, isHost, turn, playerColor, waitingForOpponent, opponent])
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 bg-background">

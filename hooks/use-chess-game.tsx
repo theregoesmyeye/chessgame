@@ -72,27 +72,35 @@ export function useChessGame() {
   const selectSquare = useCallback(
     (square: string) => {
       const result = { moved: false, from: "", to: "" }
+      console.log("Selecting square:", square, "Currently selected:", selectedSquare)
 
       // If a square is already selected
       if (selectedSquare) {
+        console.log("A square is already selected:", selectedSquare)
+        console.log("Possible moves:", possibleMoves)
+
         // Check if the clicked square is a valid destination (including captures)
         if (possibleMoves.includes(square)) {
+          console.log("Valid move destination, making move")
           // It's a valid move (including captures), so make the move
           result.from = selectedSquare
           result.to = square
           result.moved = makeMove(selectedSquare, square)
           return result
         } else {
+          console.log("Not a valid move destination")
           // If it's not a valid move destination
           const piece = game.get(square)
 
           // If it's another one of the player's pieces, select it instead
           if (piece && piece.color === game.turn()) {
+            console.log("Selecting a different piece of the same color")
             setSelectedSquare(square)
             const moves = game.moves({ square, verbose: true })
             setPossibleMoves(moves.map((move: any) => move.to))
           } else {
             // It's not a valid move and not a player's piece, so deselect
+            console.log("Deselecting current piece")
             setSelectedSquare(null)
             setPossibleMoves([])
           }
@@ -102,14 +110,18 @@ export function useChessGame() {
 
       // No square is currently selected
       const piece = game.get(square)
+      console.log("No square currently selected, piece at square:", piece)
 
       // Only select squares with pieces of the current turn
       if (piece && piece.color === game.turn()) {
+        console.log("Selecting piece:", piece)
         setSelectedSquare(square)
 
         // Get possible moves for the selected piece
         const moves = game.moves({ square, verbose: true })
-        setPossibleMoves(moves.map((move: any) => move.to))
+        const moveDestinations = moves.map((move: any) => move.to)
+        console.log("Possible move destinations:", moveDestinations)
+        setPossibleMoves(moveDestinations)
       }
 
       return result
