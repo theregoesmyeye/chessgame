@@ -10,11 +10,18 @@ interface GameControlsProps {
   onReset: () => void
   playerColor: string
   isThinking?: boolean
+  isPlayerTurn?: boolean
 }
 
-export function GameControls({ status, turn, onReset, playerColor, isThinking = false }: GameControlsProps) {
+export function GameControls({
+  status,
+  turn,
+  onReset,
+  playerColor,
+  isThinking = false,
+  isPlayerTurn = false,
+}: GameControlsProps) {
   const { currentColorScheme } = useTheme()
-  const isPlayerTurn = turn === playerColor
 
   const getStatusMessage = () => {
     if (status === "checkmate") {

@@ -12,9 +12,18 @@ interface GameInfoProps {
   gameId: string
   turn: string
   isHost: boolean
+  isPlayerTurn: boolean
 }
 
-export function GameInfo({ connected, waitingForOpponent, opponent, gameId, turn, isHost }: GameInfoProps) {
+export function GameInfo({
+  connected,
+  waitingForOpponent,
+  opponent,
+  gameId,
+  turn,
+  isHost,
+  isPlayerTurn,
+}: GameInfoProps) {
   const [copied, setCopied] = useState(false)
 
   const copyGameId = () => {
@@ -22,8 +31,6 @@ export function GameInfo({ connected, waitingForOpponent, opponent, gameId, turn
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
-  const isPlayerTurn = turn === (isHost ? "w" : "b")
 
   return (
     <div className="space-y-3">

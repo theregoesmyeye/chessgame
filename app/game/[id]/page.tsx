@@ -1,7 +1,7 @@
 "use client"
 import { useParams, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { ChessBoard } from "@/components/chess-board"
 import { GameControls } from "@/components/game-controls"
@@ -35,7 +35,7 @@ export default function Game() {
     resetGame(mode as "single" | "multi", playerColor)
   }, [mode, isHost, playerColor, resetGame])
 
-  const { connected, opponent, waitingForOpponent, syncMove } = useMultiplayerGame({
+  const { connected, opponent, waitingForOpponent, syncMove, isPlayerTurn } = useMultiplayerGame({
     gameId,
     isHost,
     onMoveReceived: makeMove,
@@ -63,21 +63,21 @@ export default function Game() {
     }
   }, [mode, connected])
 
-  // Function to check if it's the player's turn in multiplayer
-  const isPlayerTurn = () => {
+  // Function to check if it's the player's turn
+  const checkPlayerTurn = useCallback(() => {
     if (mode === "single") {
       return turn === playerColor
     } else {
-      // In multiplayer, host plays white, guest plays black
-      return turn === playerColor
+      // In multiplayer, use the isPlayerTurn value from the hook
+      return isPlayerTurn
     }
-  }
+  }, [mode, turn, playerColor, isPlayerTurn])
 
   const handleSquareClick = (square: string) => {
     // In multiplayer mode, enforce turn-based restrictions
     if (mode === "multi") {
-      if (!isPlayerTurn()) {
-        console.log("Not your turn in multiplayer. Current turn:", turn, "Your color:", playerColor)
+      if (!checkPlayerTurn()) {
+        console.log("Not your turn in multiplayer. isPlayerTurn:", isPlayerTurn)
         return
       }
 
@@ -104,8 +104,8 @@ export default function Game() {
   const handlePieceDrop = (from: string, to: string) => {
     // In multiplayer mode, enforce turn-based restrictions
     if (mode === "multi") {
-      if (!isPlayerTurn()) {
-        console.log("Not your turn in multiplayer. Current turn:", turn, "Your color:", playerColor)
+      if (!checkPlayerTurn()) {
+        console.log("Not your turn in multiplayer. isPlayerTurn:", isPlayerTurn)
         return false
       }
 
@@ -162,6 +162,7 @@ export default function Game() {
                 gameId={gameId}
                 turn={turn}
                 isHost={isHost}
+                isPlayerTurn={checkPlayerTurn()}
               />
             )}
 
@@ -181,6 +182,7 @@ export default function Game() {
               onReset={() => resetGame(mode as "single" | "multi", playerColor)}
               playerColor={playerColor}
               isThinking={isThinking}
+              isPlayerTurn={checkPlayerTurn()}
             />
 
             {mode === "multi" && !showMultiplayerInfo && (

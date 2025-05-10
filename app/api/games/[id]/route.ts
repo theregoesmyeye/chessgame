@@ -3,6 +3,13 @@ import { NextResponse } from "next/server"
 // In-memory game state storage (will reset on server restart)
 const gameStates = new Map<string, any>()
 
+// Add cache control headers to prevent caching
+const headers = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+}
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const gameId = params.id
 
@@ -14,6 +21,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       moves: [],
       lastUpdated: Date.now(),
     },
+    { headers },
   )
 }
 
@@ -35,7 +43,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (data.type === "join") {
     console.log("Player joining:", data.player)
     // Add or update player
-    const playerIndex = currentState.players.findIndex((p: any) => p.isHost === data.player.isHost)
+    const playerIndex = currentState.players.findIndex((p: any) => p.id === data.player.id)
 
     if (playerIndex >= 0) {
       currentState.players[playerIndex] = {
@@ -53,11 +61,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
     console.log("Updated players:", currentState.players)
   } else if (data.type === "move") {
     console.log("New move:", data.move)
-    // Add a new move
-    currentState.moves.push({
+
+    // Ensure the move has a timestamp
+    const moveWithTimestamp = {
       ...data.move,
-      timestamp: Date.now(),
-    })
+      timestamp: data.move.timestamp || Date.now(),
+    }
+
+    // Add a new move
+    currentState.moves.push(moveWithTimestamp)
 
     // Update player's last seen timestamp
     const playerIndex = currentState.players.findIndex((p: any) => p.id === data.playerId)
@@ -67,10 +79,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
   } else if (data.type === "ping") {
     // Update player's last seen timestamp
-    const playerIndex = currentState.players.findIndex((p: any) => p.isHost === data.isHost)
+    const playerIndex = currentState.players.findIndex((p: any) => p.id === data.playerId)
 
     if (playerIndex >= 0) {
       currentState.players[playerIndex].lastSeen = Date.now()
+    } else {
+      // If player not found, add them
+      currentState.players.push({
+        id: data.playerId,
+        isHost: data.isHost,
+        lastSeen: Date.now(),
+      })
     }
   }
 
@@ -80,5 +99,5 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // Save the updated state
   gameStates.set(gameId, currentState)
 
-  return NextResponse.json(currentState)
+  return NextResponse.json(currentState, { headers })
 }
