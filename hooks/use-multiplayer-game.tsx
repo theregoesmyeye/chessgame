@@ -13,6 +13,7 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
   const [opponent, setOpponent] = useState<string | null>(null)
   const [waitingForOpponent, setWaitingForOpponent] = useState(isHost)
   const [currentTurn, setCurrentTurn] = useState<"w" | "b">("w") // Chess always starts with white
+  const [moving, setMoving] = useState(false)
   const playerId = useRef<string>(Math.random().toString(36).substring(2, 15))
   const pollInterval = useRef<NodeJS.Timeout | null>(null)
   const lastMoveTimestamp = useRef<number>(0)
@@ -135,7 +136,9 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
   // Function to sync moves with opponent
   const syncMove = useCallback(
     async (from: string, to: string) => {
+      if (moving) return false
       try {
+        setMoving(true)
         const timestamp = Date.now()
         console.log("Syncing move:", from, "to", to, "by player:", playerId.current)
 
@@ -167,13 +170,17 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
         // Update the turn locally
         setCurrentTurn(nextTurn)
 
-        // Immediately poll for updates
-        setTimeout(pollGameState, 300)
+        // Immediately poll for updates and re-enable moving
+        setTimeout(() => {
+          pollGameState()
+          setMoving(false)
+        }, 300)
 
         return true
       } catch (error) {
         console.error("Error syncing move:", error)
         setConnected(false)
+        setMoving(false)
         return false
       }
     },
@@ -208,5 +215,6 @@ export function useMultiplayerGame({ gameId, isHost, onMoveReceived }: UseMultip
     syncMove,
     isPlayerTurn: isPlayerTurn(),
     currentTurn,
+    moving,
   }
 }

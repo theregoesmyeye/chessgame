@@ -35,7 +35,7 @@ export default function Game() {
     resetGame(mode as "single" | "multi", playerColor)
   }, [mode, isHost, playerColor, resetGame])
 
-  const { connected, opponent, waitingForOpponent, syncMove, isPlayerTurn, currentTurn } = useMultiplayerGame({
+  const { connected, opponent, waitingForOpponent, syncMove, isPlayerTurn, currentTurn, moving } = useMultiplayerGame({
     gameId,
     isHost,
     onMoveReceived: makeMove,
@@ -74,6 +74,9 @@ export default function Game() {
   }, [mode, turn, playerColor, isPlayerTurn])
 
   const handleSquareClick = (square: string) => {
+    // Prevent interactions while move is being synced
+    if (moving) return
+
     // In multiplayer mode, enforce turn-based restrictions
     if (mode === "multi") {
       if (!isPlayerTurn) {
@@ -102,6 +105,9 @@ export default function Game() {
   }
 
   const handlePieceDrop = (from: string, to: string) => {
+    // Prevent interactions while move is being synced
+    if (moving) return false
+
     // In multiplayer mode, enforce turn-based restrictions
     if (mode === "multi") {
       if (!isPlayerTurn) {
@@ -188,7 +194,7 @@ export default function Game() {
               onSquareClick={handleSquareClick}
               onPieceDrop={handlePieceDrop}
               orientation={mode === "single" ? (playerColor === "w" ? "white" : "black") : isHost ? "white" : "black"}
-              isThinking={isThinking}
+              isThinking={isThinking || moving}
             />
 
             <GameControls
