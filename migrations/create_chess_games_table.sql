@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS chess_games (
   id TEXT PRIMARY KEY,
   players JSONB DEFAULT '[]'::jsonb,
   moves JSONB DEFAULT '[]'::jsonb,
+  currentTurn TEXT DEFAULT 'w',
   lastUpdated BIGINT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
