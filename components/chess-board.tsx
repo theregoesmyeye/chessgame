@@ -31,6 +31,7 @@ export function ChessBoard({
   const [draggedPiece, setDraggedPiece] = useState<{ square: string; piece: string } | null>(null)
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null)
   const boardRef = useRef<HTMLDivElement>(null)
+  const dragControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const rows = position.split("/")
@@ -53,6 +54,14 @@ export function ChessBoard({
 
     setBoardArray(board)
   }, [position])
+
+  useEffect(() => {
+    return () => {
+      if (dragControllerRef.current) {
+        dragControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   const files = ["a", "b", "c", "d", "e", "f", "g", "h"]
   const ranks = ["8", "7", "6", "5", "4", "3", "2", "1"]
@@ -96,11 +105,14 @@ export function ChessBoard({
       e.preventDefault()
     }
 
+    // Create AbortController for this drag session
+    dragControllerRef.current = new AbortController()
+
     // Add event listeners for drag movement and end
-    document.addEventListener("mousemove", handleDragMove)
-    document.addEventListener("touchmove", handleDragMove, { passive: false })
-    document.addEventListener("mouseup", handleDragEnd)
-    document.addEventListener("touchend", handleDragEnd)
+    document.addEventListener("mousemove", handleDragMove, { signal: dragControllerRef.current.signal })
+    document.addEventListener("touchmove", handleDragMove, { passive: false, signal: dragControllerRef.current.signal })
+    document.addEventListener("mouseup", handleDragEnd, { signal: dragControllerRef.current.signal })
+    document.addEventListener("touchend", handleDragEnd, { signal: dragControllerRef.current.signal })
   }
 
   const handleDragMove = (e: MouseEvent | TouchEvent) => {
@@ -181,10 +193,10 @@ export function ChessBoard({
   const cleanup = () => {
     setDraggedPiece(null)
     setDragPosition(null)
-    document.removeEventListener("mousemove", handleDragMove)
-    document.removeEventListener("touchmove", handleDragMove)
-    document.removeEventListener("mouseup", handleDragEnd)
-    document.removeEventListener("touchend", handleDragEnd)
+    if (dragControllerRef.current) {
+      dragControllerRef.current.abort()
+      dragControllerRef.current = null
+    }
   }
 
   const renderBoard = () => {
